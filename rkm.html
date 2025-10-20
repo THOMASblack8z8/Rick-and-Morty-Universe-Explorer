@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rick and Morty API Explorer</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="rkm.css">
+</head>
+<body>
+    <div class="portal-bg"></div>
+    <div class="portal"></div>
+    
+    <div class="container">
+        <header>
+            <h1 class="title">Rick and Morty API</h1>
+            <p class="subtitle">Explore todos os personagens da série em uma dimensão interativa!</p>
+        </header>
+        
+        <div class="search-container">
+            <div class="search-box">
+                <input type="text" class="search-input" placeholder="Buscar personagem...">
+                <button class="search-btn">Wubba Lubba Dub Dub!</button>
+            </div>
+        </div>
+        
+        <div class="filters">
+            <button class="filter-btn active" data-status="">Todos</button>
+            <button class="filter-btn" data-status="alive">Vivos</button>
+            <button class="filter-btn" data-status="dead">Mortos</button>
+            <button class="filter-btn" data-status="unknown">Desconhecidos</button>
+        </div>
+        
+        <div class="characters-grid" id="charactersGrid">
+            <!-- Os personagens serão carregados aqui -->
+        </div>
+        
+        <div class="pagination" id="pagination">
+            <!-- A paginação será carregada aqui -->
+        </div>
+        
+        <div class="loading" id="loading">Carregando personagens...</div>
+    </div>
+    
+    <div class="morty-face">
+        <i class="fas fa-user-astronaut"></i>
+    </div>
+    
+    <div class="character-modal" id="characterModal">
+        <div class="modal-content">
+            <button class="close-modal">&times;</button>
+            <img class="modal-character-image" id="modalImage" src="" alt="">
+            <h2 class="modal-character-name" id="modalName"></h2>
+            <p class="modal-character-info" id="modalSpecies"></p>
+            <p class="modal-character-info" id="modalStatus"></p>
+            <p class="modal-character-info" id="modalGender"></p>
+            <p class="modal-character-info" id="modalOrigin"></p>
+            <p class="modal-character-info" id="modalLocation"></p>
+        </div>
+    </div>
+    
+    <footer>
+        <p>Desenvolvido com a <a href="https://rickandmortyapi.com/" target="_blank" style="color: #00ff9d;">Rick and Morty API</a></p>
+    </footer>
+
+    <script>
+        // Elementos DOM
+        const charactersGrid = document.getElementById('charactersGrid');
+        const pagination = document.getElementById('pagination');
+        const loading = document.getElementById('loading');
+        const searchInput = document.querySelector('.search-input');
+        const searchBtn = document.querySelector('.search-btn');
+        const filterBtns = document.querySelectorAll('.filter-btn');
+        const characterModal = document.getElementById('characterModal');
+        const closeModal = document.querySelector('.close-modal');
+        const modalImage = document.getElementById('modalImage');
+        const modalName = document.getElementById('modalName');
+        const modalSpecies = document.getElementById('modalSpecies');
+        const modalStatus = document.getElementById('modalStatus');
+        const modalGender = document.getElementById('modalGender');
+        const modalOrigin = document.getElementById('modalOrigin');
+        const modalLocation = document.getElementById('modalLocation');
+        
+        // Variáveis de estado
+        let currentPage = 1;
+        let totalPages = 1;
+        let currentStatus = '';
+        let currentSearch = '';
+        
+        // Carregar personagens
+        async function loadCharacters(page = 1, status = '', name = '') {
+            loading.style.display = 'block';
+            charactersGrid.innerHTML = '';
+            
+            try {
+                const response = await fetch(
+                    `https://rickandmortyapi.com/api/character?page=${page}&status=${status}&name=${name}`
+                );
+                const data = await response.json();
+                
+                // Verificar se há resultados
+                if (data.results) {
+                    displayCharacters(data.results);
+                    setupPagination(data.info);
+                } else {
+                    charactersGrid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; font-size: 1.2rem;">Nenhum personagem encontrado!</p>';
+                    pagination.innerHTML = '';
+                }
+            } catch (error) {
+                console.error('Erro ao carregar personagens:', error);
+                charactersGrid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; font-size: 1.2rem;">Erro ao carregar personagens. Tente novamente!</p>';
+                pagination.innerHTML = '';
+            }
+            
+            loading.style.display = 'none';
+        }
+        
+        // Exibir personagens
+        function displayCharacters(characters) {
+            charactersGrid.innerHTML = '';
+            
+            characters.forEach(character => {
+                const characterCard = document.createElement('div');
+                characterCard.className = 'character-card';
+                characterCard.innerHTML = `
+                    <img src="${character.image}" alt="${character.name}" class="character-image">
+                    <div class="character-info">
+                        <h3 class="character-name">${character.name}</h3>
+                        <p class="character-species">${character.species}</p>
+                        <p class="character-status ${character.status.toLowerCase()}">${character.status}</p>
+                    </div>
+                `;
+                
+                characterCard.addEventListener('click', () => {
+                    showCharacterModal(character);
+                });
+                
+                charactersGrid.appendChild(characterCard);
+            });
+        }
+        
+        // Configurar paginação
+        function setupPagination(info) {
+            pagination.innerHTML = '';
+            totalPages = info.pages;
+            
+            // Botão anterior
+            if (info.prev) {
+                const prevBtn = document.createElement('button');
+                prevBtn.className = 'page-btn';
+                prevBtn.innerHTML = '<i class="fas fa-chevron-left"></i>';
+                prevBtn.addEventListener('click', () => {
+                    currentPage--;
+                    loadCharacters(currentPage, currentStatus, currentSearch);
+                });
+                pagination.appendChild(prevBtn);
+            }
+            
+            // Números de página
+            const startPage = Math.max(1, currentPage - 2);
+            const endPage = Math.min(totalPages, currentPage + 2);
+            
+            for (let i = startPage; i <= endPage; i++) {
+                const pageBtn = document.createElement('button');
+                pageBtn.className = `page-btn ${i === currentPage ? 'active' : ''}`;
+                pageBtn.textContent = i;
+                pageBtn.addEventListener('click', () => {
+                    currentPage = i;
+                    loadCharacters(currentPage, currentStatus, currentSearch);
+                });
+                pagination.appendChild(pageBtn);
+            }
+            
+            // Botão próximo
+            if (info.next) {
+                const nextBtn = document.createElement('button');
+                nextBtn.className = 'page-btn';
+                nextBtn.innerHTML = '<i class="fas fa-chevron-right"></i>';
+                nextBtn.addEventListener('click', () => {
+                    currentPage++;
+                    loadCharacters(currentPage, currentStatus, currentSearch);
+                });
+                pagination.appendChild(nextBtn);
+            }
+        }
+        
+        // Mostrar modal do personagem
+        function showCharacterModal(character) {
+            modalImage.src = character.image;
+            modalName.textContent = character.name;
+            modalSpecies.textContent = `Espécie: ${character.species}`;
+            modalStatus.textContent = `Status: ${character.status}`;
+            modalGender.textContent = `Gênero: ${character.gender}`;
+            modalOrigin.textContent = `Origem: ${character.origin.name}`;
+            modalLocation.textContent = `Localização: ${character.location.name}`;
+            
+            characterModal.classList.add('active');
+        }
+        
+        // Fechar modal
+        closeModal.addEventListener('click', () => {
+            characterModal.classList.remove('active');
+        });
+        
+        // Fechar modal ao clicar fora
+        characterModal.addEventListener('click', (e) => {
+            if (e.target === characterModal) {
+                characterModal.classList.remove('active');
+            }
+        });
+        
+        // Buscar personagens
+        searchBtn.addEventListener('click', () => {
+            currentSearch = searchInput.value;
+            currentPage = 1;
+            loadCharacters(currentPage, currentStatus, currentSearch);
+        });
+        
+        // Buscar ao pressionar Enter
+        searchInput.addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') {
+                currentSearch = searchInput.value;
+                currentPage = 1;
+                loadCharacters(currentPage, currentStatus, currentSearch);
+            }
+        });
+        
+        // Filtrar por status
+        filterBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                filterBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                
+                currentStatus = btn.dataset.status;
+                currentPage = 1;
+                loadCharacters(currentPage, currentStatus, currentSearch);
+            });
+        });
+        
+        // Inicializar
+        loadCharacters();
+        
+        // Efeito de digitação no título
+        const title = document.querySelector('.title');
+        const originalText = title.textContent;
+        title.textContent = '';
+        
+        let i = 0;
+        function typeWriter() {
+            if (i < originalText.length) {
+                title.textContent += originalText.charAt(i);
+                i++;
+                setTimeout(typeWriter, 100);
+            }
+        }
+        
+        setTimeout(typeWriter, 1000);
+    </script>
+</body>
+</html>
